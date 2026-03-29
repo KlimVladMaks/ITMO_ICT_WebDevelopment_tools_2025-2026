@@ -9,7 +9,7 @@ deactivate
 # Запуск сервера
 
 ```
-uvicorn main:app --reload
+uvicorn src.main:app --reload
 ```
 
 # Docs

@@ -3,13 +3,6 @@ from typing import Optional, List
 from enum import Enum
 
 
-class ProjectStatus(Enum):
-    draft = "draft"
-    active = "active"
-    completed = "completed"
-    cancelled = "cancelled"
-
-
 class SkillLevel(Enum):
     learning = "learning"
     novice = "novice"
@@ -30,11 +23,3 @@ class User(BaseModel):
     full_name: str
     about: str
     skills: Optional[List[Skill]]
-
-
-class Project(BaseModel):
-    id: int
-    name: str
-    description: str
-    status: ProjectStatus
-    members: Optional[List[User]]
