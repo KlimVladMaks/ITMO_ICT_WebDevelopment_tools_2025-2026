@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Сервис базы данных (PostgreSQL)
   db:
     image: postgres:18.3-alpine
     container_name: project_partner_db
@@ -12,6 +13,30 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  # Сервис веб-интерфейса (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:9.13
+    container_name: project_partner_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "8080:80"  # Доступ к интерфейсу по адресу localhost:8080
+    depends_on:
+      - db
+    networks:
+      - app-network
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   pgdata:
+  pgadmin-data:

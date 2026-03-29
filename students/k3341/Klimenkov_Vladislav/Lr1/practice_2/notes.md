@@ -1,4 +1,6 @@
-# Работа .venv
+# Заметки
+
+## Работа .venv
 
 ```
 python3 -m venv .venv
@@ -6,26 +8,26 @@ source .venv/bin/activate
 deactivate
 ```
 
-# Запуск сервера
+## Запуск сервера
 
 ```
 uvicorn src.main:app --reload
 ```
 
-# Docs
+## Docs
 
 ```
 127.0.0.1:8000/docs
 ```
 
-# Работа с ресурсами
+## Работа с ресурсами
 
 ```
 pip freeze > requirements.txt
 pip install -r requirements.txt
 ```
 
-# Docker Compose
+## Docker Compose
 
 ```
 # Список запущенных сервисов
@@ -44,7 +46,7 @@ docker compose stop
 docker compose start
 ```
 
-# Добавление пользователя в группу `docker`
+## Добавление пользователя в группу `docker`
 
 Данные команды требуются для работы с Docker без `sudo`.
 
@@ -53,6 +55,30 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-# Шпаргалка по Docker и Docker Compose
+## Шпаргалка по Docker и Docker Compose
 
 https://rabrain.ru/special/handbook/docker/remember/
+
+## Доступ к PostgreSQL через веб-интерфейс pgAdmin
+
+Доступ к веб-интерфейсу pgAdmin можно получить по адресу:
+
+http://localhost:8080/
+
+Настройки для подключения к БД:
+
+```
+General:
+    - Name: project_partner_db  # Но можно дать любое другое
+Connection:
+    # Важно! Так как они в одной сети Docker, нужно указывать не `localhost`, 
+    # а имя сервиса из docker-compose, то есть: `db`
+    - Host name/address: db
+    - Port: 5432
+    - Maintenance database: partners_db
+    - Username: user
+    - Password: 12345
+    - Save password?  # Активировать этот пункт
+
+-> Нажать "Save"
+```
