@@ -40,10 +40,16 @@ docker-compose up -d
 docker-compose down
 
 # Остановка контейнера
-docker compose stop
+docker-compose stop
 
 # Запуск остановленного контейнера
-docker compose start
+docker-compose start
+
+# Остановить и удалить контейнер вместе с данными
+docker-compose down -v
+
+# Посмотреть существующие volumes
+docker volume ls
 ```
 
 ## Добавление пользователя в группу `docker`
@@ -81,4 +87,12 @@ Connection:
     - Save password?  # Активировать этот пункт
 
 -> Нажать "Save"
+```
+
+## Работа с Makefile
+
+```
+make up
+make down
+make restart
 ```

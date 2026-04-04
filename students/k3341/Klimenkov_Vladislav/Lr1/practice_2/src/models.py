@@ -41,14 +41,14 @@ class UserSkill(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     skill_id: int = Field(foreign_key="skill.id")
     level: Optional[SkillLevel] = Field(default=None)
-    added_at: datetime = Field(default_factory=get_utc_now())
+    added_at: datetime = Field(default_factory=get_utc_now)
 
 
 class UserInterest(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     interest_id: int = Field(foreign_key="interest.id")
-    added_at: datetime = Field(default_factory=get_utc_now())
+    added_at: datetime = Field(default_factory=get_utc_now)
 
 
 class ProjectMember(SQLModel, table=True):
@@ -56,7 +56,7 @@ class ProjectMember(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     project_id: int = Field(foreign_key="project.id")
     role: Optional[str] = Field(default=None)
-    joined_at: datetime = Field(default_factory=get_utc_now())
+    joined_at: datetime = Field(default_factory=get_utc_now)
 
 
 # ===== Основные модели =====
@@ -68,8 +68,8 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True)
     full_name: str = Field()
     about: Optional[str] = Field(default=None)
-    created_at: datetime = Field(default_factory=get_utc_now())
-    updated_at: datetime = Field(default_factory=get_utc_now())
+    created_at: datetime = Field(default_factory=get_utc_now)
+    updated_at: datetime = Field(default_factory=get_utc_now)
 
     skills: List["Skill"] = Relationship(
         back_populates="users",
@@ -84,35 +84,30 @@ class User(SQLModel, table=True):
         link_model=ProjectMember
     )
     tasks: List["Task"] = Relationship(back_populates="assignee")
-    user_skills: List[UserSkill] = Relationship(back_populates="user")
-    user_interests: List[UserInterest] = Relationship(back_populates="user")
-    project_memberships: List[ProjectMember] = Relationship(back_populates="user")
 
 
 class Skill(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
-    created_at: datetime = Field(default_factory=get_utc_now())
-    updated_at: datetime = Field(default_factory=get_utc_now())
+    created_at: datetime = Field(default_factory=get_utc_now)
+    updated_at: datetime = Field(default_factory=get_utc_now)
 
     users: List[User] = Relationship(
         back_populates="skills",
         link_model=UserSkill
     )
-    user_skills: List[UserSkill] = Relationship(back_populates="skill")
 
 
 class Interest(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
-    created_at: datetime = Field(default_factory=get_utc_now())
-    updated_at: datetime = Field(default_factory=get_utc_now())
+    created_at: datetime = Field(default_factory=get_utc_now)
+    updated_at: datetime = Field(default_factory=get_utc_now)
 
     users: List[User] = Relationship(
         back_populates="interests",
         link_model=UserInterest
     )
-    user_interests: List[UserInterest] = Relationship(back_populates="interest")
 
 
 class Project(SQLModel, table=True):
@@ -121,15 +116,14 @@ class Project(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     status: ProjectStatus = Field(default=ProjectStatus.draft)
     deadline: Optional[datetime] = Field(default=None)
-    created_at: datetime = Field(default_factory=get_utc_now())
-    updated_at: datetime = Field(default_factory=get_utc_now())
+    created_at: datetime = Field(default_factory=get_utc_now)
+    updated_at: datetime = Field(default_factory=get_utc_now)
 
     members: List[User] = Relationship(
         back_populates="projects",
         link_model=ProjectMember
     )
     tasks: List["Task"] = Relationship(back_populates="project")
-    project_members: List[ProjectMember] = Relationship(back_populates="project")
 
 
 class Task(SQLModel, table=True):
@@ -140,8 +134,8 @@ class Task(SQLModel, table=True):
     description: Optional[str] = Field(default=None)
     status: TaskStatus = Field(default=TaskStatus.todo)
     deadline: Optional[datetime] = Field(default=None)
-    created_at: datetime = Field(default_factory=get_utc_now())
-    updated_at: datetime = Field(default_factory=get_utc_now())
+    created_at: datetime = Field(default_factory=get_utc_now)
+    updated_at: datetime = Field(default_factory=get_utc_now)
 
     project: Optional[Project] = Relationship(back_populates="tasks")
     assignee: Optional[User] = Relationship(back_populates="tasks")
