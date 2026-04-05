@@ -15,6 +15,91 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
+# ========== Users ==========
+
+
+@app.get("/users", response_model=List[schemas.UserRead], tags=["Users"])
+def get_users(session: Session = Depends(get_session)):
+    users = crud.get_users(session)
+    return users
+
+
+@app.post("/users", response_model=schemas.UserRead, status_code=status.HTTP_201_CREATED, tags=["Users"])
+def create_user(
+    user_in: schemas.UserCreate,
+    session: Session = Depends(get_session)
+):
+    if crud.get_user_by_username(session, user_in.username):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Этот username уже занят"
+        )
+    if crud.get_user_by_email(session, user_in.email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Этот email уже занят"
+        )
+    user = crud.create_user(session, user_in)
+    return user
+
+
+@app.get("/users/{user_id}", response_model=schemas.UserRead, tags=["Users"])
+def get_user(
+    user_id: int,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    return user
+
+
+@app.patch("/users/{user_id}", response_model=schemas.UserRead, tags=["Users"])
+def update_user(
+    user_id: int,
+    user_in: schemas.UserUpdate,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    if user_in.username and user_in.username != user.username:
+        if crud.get_user_by_username(session, user_in.username):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Этот username уже занят"
+            )
+    if user_in.email and user_in.email != user.email:
+        if crud.get_user_by_email(session, user_in.email):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Этот email уже занят"
+            )
+    user = crud.update_user(session, user, user_in)
+    return user
+
+
+@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Users"])
+def delete_user(
+    user_id: int,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    crud.delete_user(session, user)
+    return None
+
+
 # ========== Skills ==========
 
 
@@ -91,6 +176,103 @@ def delete_skill(
     return None
 
 
+# ========== UserSkills ==========
+
+
+@app.get("/users/{user_id}/skills", response_model=List[schemas.UserSkillRead], tags=["UserSkills"])
+def get_user_skills(
+    user_id: int,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден",
+        )
+    skills = crud.get_user_skills(session, user_id)
+    return skills
+
+
+@app.post("/users/{user_id}/skills", 
+          response_model=schemas.UserSkillRead, 
+          status_code=status.HTTP_201_CREATED, 
+          tags=["UserSkills"])
+def add_user_skill(
+    user_id: int,
+    skill_in: schemas.UserSkillCreate,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден",
+        )
+    skill = crud.get_skill_by_id(session, skill_in.skill_id)
+    if not skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Навык не найден",
+        )
+    existing = crud.get_user_skill(session, user_id, skill_in.skill_id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Пользователь уже имеет этот навык"
+        )
+    user_skill = crud.add_user_skill(session, user_id, skill_in)
+    return user_skill
+
+
+@app.get("/users/{user_id}/skills/{skill_id}", response_model=schemas.UserSkillRead, tags=["UserSkills"])
+def get_user_skill(
+    user_id: int,
+    skill_id: int,
+    session: Session = Depends(get_session)
+):
+    user_skill = crud.get_user_skill(session, user_id, skill_id)
+    if not user_skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Навык пользователя не найден",
+        )
+    return user_skill
+
+
+@app.delete("/users/{user_id}/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["UserSkills"])
+def delete_user_skill(
+    user_id: int,
+    skill_id: int,
+    session: Session = Depends(get_session)
+):
+    user_skill = crud.get_user_skill(session, user_id, skill_id)
+    if not user_skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Навык пользователя не найден",
+        )
+    crud.delete_user_skill(session, user_skill)
+    return None
+
+
+@app.patch("/users/{user_id}/skills/{skill_id}/level", response_model=schemas.UserSkillRead, tags=["UserSkills"])
+def update_user_skill_level(
+    user_id: int,
+    skill_id: int,
+    level_in: schemas.UserSkillUpdateLevel,
+    session: Session = Depends(get_session)
+):
+    user_skill = crud.get_user_skill(session, user_id, skill_id)
+    if not user_skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Навык пользователя не найден",
+        )
+    user_skill = crud.update_user_skill_level(session, user_skill, level_in)
+    return user_skill
+
+
 # ========== Interests ==========
 
 
@@ -164,4 +346,381 @@ def delete_interest(
             detail="Навык не найден",
         )
     crud.delete_interest(session, interest)
+    return None
+
+
+# ========== UserInterests ==========
+
+
+@app.get("/users/{user_id}/interests", response_model=List[schemas.UserInterestRead], tags=["UserInterests"])
+def get_user_interests(
+    user_id: int,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    interests = crud.get_user_interests(session, user_id)
+    return interests
+
+
+@app.post("/users/{user_id}/interests", 
+          response_model=schemas.UserInterestRead, 
+          status_code=status.HTTP_201_CREATED, 
+          tags=["UserInterests"])
+def add_user_interest(
+    user_id: int,
+    interest_in: schemas.UserInterestCreate,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    interest = crud.get_interest_by_id(session, interest_in.interest_id)
+    if not interest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Интерес не найден"
+        )
+    existing = crud.get_user_interest(session, user_id, interest_in.interest_id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Пользователь уже имеет этот интерес"
+        )
+    user_interest = crud.add_user_interest(session, user_id, interest_in)
+    return user_interest
+
+
+@app.get("/users/{user_id}/interests/{interest_id}", 
+         response_model=schemas.UserInterestRead, 
+         tags=["UserInterests"])
+def get_user_interest(
+    user_id: int,
+    interest_id: int,
+    session: Session = Depends(get_session)
+):
+    user_interest = crud.get_user_interest(session, user_id, interest_id)
+    if not user_interest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Интерес пользователя не найден"
+        )
+    return user_interest
+
+
+@app.delete("/users/{user_id}/interests/{interest_id}", 
+            status_code=status.HTTP_204_NO_CONTENT, 
+            tags=["UserInterests"])
+def delete_user_interest(
+    user_id: int,
+    interest_id: int,
+    session: Session = Depends(get_session)
+):
+    user_interest = crud.get_user_interest(session, user_id, interest_id)
+    if not user_interest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Интерес пользователя не найден"
+        )
+    crud.delete_user_interest(session, user_interest)
+    return None
+
+
+# ========== Projects ==========
+
+
+@app.get("/projects", response_model=List[schemas.ProjectRead], tags=["Projects"])
+def get_projects(session: Session = Depends(get_session)):
+    projects = crud.get_projects(session)
+    return projects
+
+
+@app.post("/projects", response_model=schemas.ProjectRead, status_code=status.HTTP_201_CREATED, tags=["Projects"])
+def create_project(
+    project_in: schemas.ProjectCreate,
+    session: Session = Depends(get_session)
+):
+    project = crud.create_project(session, project_in)
+    return project
+
+
+@app.get("/projects/{project_id}", response_model=schemas.ProjectRead, tags=["Projects"])
+def get_project(
+    project_id: int,
+    session: Session = Depends(get_session)
+):
+    project = crud.get_project_by_id(session, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    return project
+
+
+@app.patch("/projects/{project_id}", response_model=schemas.ProjectRead, tags=["Projects"])
+def update_project(
+    project_id: int,
+    project_in: schemas.ProjectUpdate,
+    session: Session = Depends(get_session)
+):
+    project = crud.get_project_by_id(session, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    project = crud.update_project(session, project, project_in)
+    return project
+
+
+@app.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Projects"])
+def delete_project(
+    project_id: int,
+    session: Session = Depends(get_session)
+):
+    project = crud.get_project_by_id(session, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    crud.delete_project(session, project)
+    return None
+
+
+@app.get("/users/{user_id}/projects", response_model=List[schemas.ProjectRead], tags=["Projects"])
+def get_user_projects(
+    user_id: int,
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    projects = crud.get_user_projects(session, user_id)
+    return projects
+
+
+# ========== ProjectMembers ==========
+
+
+@app.get("/projects/{project_id}/members", 
+         response_model=List[schemas.ProjectMemberRead], 
+         tags=["ProjectMembers"])
+def get_project_members(
+    project_id: int,
+    session: Session = Depends(get_session)
+):
+    project = crud.get_project_by_id(session, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    members = crud.get_project_members(session, project_id)
+    return members
+
+
+@app.post("/projects/{project_id}/members", 
+          response_model=schemas.ProjectMemberRead, 
+          status_code=status.HTTP_201_CREATED, 
+          tags=["ProjectMembers"])
+def add_project_member(
+    project_id: int,
+    member_in: schemas.ProjectMemberCreate,
+    session: Session = Depends(get_session)
+):
+    project = crud.get_project_by_id(session, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    user = crud.get_user_by_id(session, member_in.user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    existing = crud.get_project_member(session, project_id, member_in.user_id)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Пользователь уже является участником данного проекта"
+        )
+    member = crud.add_project_member(session, project_id, member_in)
+    return member
+
+
+@app.get("/projects/{project_id}/members/{user_id}", 
+         response_model=schemas.ProjectMemberRead, 
+         tags=["ProjectMembers"])
+def get_project_member(
+    project_id: int,
+    user_id: int,
+    session: Session = Depends(get_session)
+):
+    member = crud.get_project_member(session, project_id, user_id)
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Участник проекта не найден"
+        )
+    return member
+
+
+@app.delete("/projects/{project_id}/members/{user_id}", 
+            status_code=status.HTTP_204_NO_CONTENT, 
+            tags=["ProjectMembers"])
+def delete_project_member(
+    project_id: int,
+    user_id: int,
+    session: Session = Depends(get_session)
+):
+    member = crud.get_project_member(session, project_id, user_id)
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Участник проекта не найден"
+        )
+    crud.delete_project_member(session, member)
+    return None
+
+
+@app.patch("/projects/{project_id}/members/{user_id}/role", 
+           response_model=schemas.ProjectMemberRead, 
+           tags=["ProjectMembers"])
+def update_project_member_role(
+    project_id: int,
+    user_id: int,
+    role_in: schemas.ProjectMemberUpdateRole,
+    session: Session = Depends(get_session)
+):
+    member = crud.get_project_member(session, project_id, user_id)
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Участник проекта не найден"
+        )
+    member = crud.update_project_member(session, member, role_in)
+    return member
+
+
+# ========== Tasks ==========
+
+
+@app.get("/projects/{project_id}/tasks", response_model=List[schemas.TaskRead], tags=["Tasks"])
+def get_tasks(
+    project_id: int,
+    session: Session = Depends(get_session),
+):
+    project = crud.get_project_by_id(session, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    tasks = crud.get_tasks_by_project(session, project_id)
+    return tasks
+
+
+@app.post("/projects/{project_id}/tasks", 
+          response_model=schemas.TaskRead, 
+          status_code=status.HTTP_201_CREATED, 
+          tags=["Tasks"])
+def create_task(
+    project_id: int,
+    task_in: schemas.TaskCreate,
+    session: Session = Depends(get_session)
+):
+    project = crud.get_project_by_id(session, project_id)
+    if not project:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Проект не найден"
+        )
+    assignee = crud.get_user_by_id(session, task_in.assignee_id)
+    if not assignee:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Получатель задачи не найден"
+        )
+    member = crud.get_project_member(session, project_id, task_in.assignee_id)
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Получатель задачи не является участником проекта"
+        )
+    task = crud.create_task(session, project_id, task_in)
+    return task
+
+
+@app.get("/projects/{project_id}/tasks/{task_id}", response_model=schemas.TaskRead, tags=["Tasks"])
+def get_task(
+    project_id: int,
+    task_id: int,
+    session: Session = Depends(get_session)
+):
+    task = crud.get_task_by_id(session, task_id)
+    if not task or task.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Задача не найдена в этом проекте"
+        )
+    return task
+
+
+@app.patch("/projects/{project_id}/tasks/{task_id}", response_model=schemas.TaskRead, tags=["Tasks"])
+def update_task(
+    project_id: int,
+    task_id: int,
+    task_in: schemas.TaskUpdate,
+    session: Session = Depends(get_session)
+):
+    task = crud.get_task_by_id(session, task_id)
+    if not task or task.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Задача не найдена в этом проекте"
+        )
+    if task_in.assignee_id is not None:
+        assignee = crud.get_user_by_id(session, task_in.assignee_id)
+        if not assignee:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Новый получатель задачи не найден"
+            )
+        member = crud.get_project_member(session, project_id, task_in.assignee_id)
+        if not member:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Новый получатель задачи не является участником проекта"
+            )
+    task = crud.update_task(session, task, task_in)
+    return task
+
+
+@app.delete("/projects/{project_id}/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Tasks"])
+def delete_task(
+    project_id: int,
+    task_id: int,
+    session: Session = Depends(get_session)
+):
+    task = crud.get_task_by_id(session, task_id)
+    if not task or task.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Задача не найдена в этом проекте"
+        )
+    crud.delete_task(session, task)
     return None
