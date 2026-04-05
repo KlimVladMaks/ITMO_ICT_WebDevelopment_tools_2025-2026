@@ -496,7 +496,7 @@ def delete_project(
     return None
 
 
-@app.get("/users/{user_id}/projects", response_model=List[schemas.ProjectFullRead], tags=["Projects"])
+@app.get("/users/{user_id}/projects", response_model=List[schemas.ProjectShortRead], tags=["Projects"])
 def get_user_projects(
     user_id: int,
     session: Session = Depends(get_session)

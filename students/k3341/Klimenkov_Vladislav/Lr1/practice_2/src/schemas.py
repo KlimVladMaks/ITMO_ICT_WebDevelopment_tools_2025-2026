@@ -23,8 +23,9 @@ class UserFullRead(BaseModel):
     about: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    user_skills: Optional[List["UserSkillRead"]] = None
-    user_interests: Optional[List["UserInterestRead"]] = None
+    user_skills: List["UserSkillRead"]
+    user_interests: List["UserInterestRead"]
+    projects: List["ProjectShortRead"]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -207,7 +208,6 @@ class TaskRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     assignee: UserShortRead
-    project: ProjectShortRead
 
     model_config = ConfigDict(from_attributes=True)
 
