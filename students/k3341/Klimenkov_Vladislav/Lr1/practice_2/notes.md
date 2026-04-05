@@ -1,5 +1,18 @@
 # Заметки
 
+## Основные команды для работы с проектом
+
+```
+# Запуск PostgreSQL
+docker-compose up -d
+
+# Запуск FastAPI
+uvicorn src.main:app --reload
+
+# Отключение PostgreSQL
+docker-compose down
+```
+
 ## Работа .venv
 
 ```

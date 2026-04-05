@@ -1,9 +1,14 @@
 from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 from datetime import datetime
 
 
 # ========== Skills ==========
+
+
+class SkillCreate(BaseModel):
+    name: str
 
 
 class SkillRead(BaseModel):
@@ -15,5 +20,5 @@ class SkillRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class SkillCreate(BaseModel):
+class SkillUpdate(BaseModel):
     name: str

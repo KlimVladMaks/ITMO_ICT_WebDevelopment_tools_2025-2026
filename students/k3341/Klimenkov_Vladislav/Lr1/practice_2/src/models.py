@@ -112,7 +112,7 @@ class Interest(SQLModel, table=True):
 
 class Project(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field()
+    title: str = Field()
     description: Optional[str] = Field(default=None)
     status: ProjectStatus = Field(default=ProjectStatus.draft)
     deadline: Optional[datetime] = Field(default=None)
