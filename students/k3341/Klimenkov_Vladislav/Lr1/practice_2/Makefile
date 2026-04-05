@@ -7,8 +7,6 @@ up:
 	sleep 3
 	@echo "Запускаем FastAPI..."
 	. .venv/bin/activate && uvicorn src.main:app --reload
-	sleep 1
-	@echo "Все процессы запущены!"
 
 down:
 	@echo "Остановка FastAPI..."

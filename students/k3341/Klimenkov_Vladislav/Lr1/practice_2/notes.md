@@ -63,6 +63,9 @@ docker-compose down -v
 
 # Посмотреть существующие volumes
 docker volume ls
+
+# Удалить неиспользуемые тома
+docker volume prune
 ```
 
 ## Добавление пользователя в группу `docker`

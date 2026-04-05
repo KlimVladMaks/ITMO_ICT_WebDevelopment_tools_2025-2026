@@ -50,8 +50,38 @@ def delete_skill(session: Session, skill: models.Skill) -> None:
 
 
 def get_interests(session: Session) -> List[models.Interest]:
-    return session.exec(select(models.Skill)).all()
+    return session.exec(select(models.Interest)).all()
+
+
+def get_interest_by_id(session: Session, interest_id: int) -> Optional[models.Interest]:
+    return session.get(models.Interest, interest_id)
 
 
 def get_interest_by_name(session: Session, name: str) -> Optional[models.Interest]:
-    return session.exec(select(models.Skill).where(models.Skill.name == name)).first()
+    return session.exec(select(models.Interest).where(models.Interest.name == name)).first()
+
+
+def create_interest(session: Session, interest_in: schemas.InterestCreate) -> models.Interest:
+    interest = models.Interest(name=interest_in.name)
+    session.add(interest)
+    session.commit()
+    session.refresh(interest)
+    return interest
+
+
+def update_interest(
+        session: Session, 
+        interest: models.Interest, 
+        interest_in: schemas.InterestUpdate
+) -> models.Interest:
+    interest.name = interest_in.name
+    interest.updated_at = models.get_utc_now()
+    session.add(interest)
+    session.commit()
+    session.refresh(interest)
+    return interest
+
+
+def delete_interest(session: Session, interest: models.Interest) -> None:
+    session.delete(interest)
+    session.commit()

@@ -43,12 +43,18 @@ class UserSkill(SQLModel, table=True):
     level: Optional[SkillLevel] = Field(default=None)
     added_at: datetime = Field(default_factory=get_utc_now)
 
+    user: "User" = Relationship(back_populates="user_skills")
+    skill: "Skill" = Relationship(back_populates="user_skills")
+
 
 class UserInterest(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     interest_id: int = Field(foreign_key="interest.id")
     added_at: datetime = Field(default_factory=get_utc_now)
+
+    user: "User" = Relationship(back_populates="user_interests")
+    interest: "Interest" = Relationship(back_populates="user_interests")
 
 
 class ProjectMember(SQLModel, table=True):
@@ -57,6 +63,9 @@ class ProjectMember(SQLModel, table=True):
     project_id: int = Field(foreign_key="project.id")
     role: Optional[str] = Field(default=None)
     joined_at: datetime = Field(default_factory=get_utc_now)
+
+    user: "User" = Relationship(back_populates="project_memberships")
+    project: "Project" = Relationship(back_populates="project_members")
 
 
 # ===== Основные модели =====
@@ -74,14 +83,29 @@ class User(SQLModel, table=True):
     skills: List["Skill"] = Relationship(
         back_populates="users",
         link_model=UserSkill,
+        sa_relationship_kwargs={"overlaps": "user_skills"}
     )
     interests: List["Interest"] = Relationship(
         back_populates="users",
-        link_model=UserInterest
+        link_model=UserInterest,
+        sa_relationship_kwargs={"overlaps": "user_interests"}
     )
     projects: List["Project"] = Relationship(
         back_populates="members",
-        link_model=ProjectMember
+        link_model=ProjectMember,
+        sa_relationship_kwargs={"overlaps": "project_memberships"}
+    )
+    user_skills: List[UserSkill] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"overlaps": "skills"}
+    )
+    user_interests: List[UserInterest] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"overlaps": "interests"}
+    )
+    project_memberships: List[ProjectMember] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"overlaps": "projects"}
     )
     tasks: List["Task"] = Relationship(back_populates="assignee")
 
@@ -94,7 +118,12 @@ class Skill(SQLModel, table=True):
 
     users: List[User] = Relationship(
         back_populates="skills",
-        link_model=UserSkill
+        link_model=UserSkill,
+        sa_relationship_kwargs={"overlaps": "user_skills"}
+    )
+    user_skills: List[UserSkill] = Relationship(
+        back_populates="skill",
+        sa_relationship_kwargs={"overlaps": "users"}
     )
 
 
@@ -106,7 +135,12 @@ class Interest(SQLModel, table=True):
 
     users: List[User] = Relationship(
         back_populates="interests",
-        link_model=UserInterest
+        link_model=UserInterest,
+        sa_relationship_kwargs={"overlaps": "user_interests"}
+    )
+    user_interests: List[UserInterest] = Relationship(
+        back_populates="interest",
+        sa_relationship_kwargs={"overlaps": "users"}
     )
 
 
@@ -121,7 +155,12 @@ class Project(SQLModel, table=True):
 
     members: List[User] = Relationship(
         back_populates="projects",
-        link_model=ProjectMember
+        link_model=ProjectMember,
+        sa_relationship_kwargs={"overlaps": "project_members"}
+    )
+    project_members: List[ProjectMember] = Relationship(
+        back_populates="project",
+        sa_relationship_kwargs={"overlaps": "members"}
     )
     tasks: List["Task"] = Relationship(back_populates="project")
 
