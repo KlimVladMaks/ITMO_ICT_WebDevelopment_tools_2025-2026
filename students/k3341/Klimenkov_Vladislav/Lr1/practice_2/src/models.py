@@ -48,12 +48,18 @@ class UserSkill(SQLModel, table=True):
     level: Optional[SkillLevel] = Field(default=None)
     added_at: datetime = Field(default_factory=get_utc_now)
 
+    user: "User" = Relationship(back_populates="user_skills")
+    skill: "Skill" = Relationship(back_populates="user_skills")
+
 
 class UserInterest(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     interest_id: int = Field(foreign_key="interest.id")
     added_at: datetime = Field(default_factory=get_utc_now)
+
+    user: "User" = Relationship(back_populates="user_interests")
+    interest: "Interest" = Relationship(back_populates="user_interests")
 
 
 class ProjectMember(SQLModel, table=True):
@@ -62,6 +68,9 @@ class ProjectMember(SQLModel, table=True):
     project_id: int = Field(foreign_key="project.id")
     role: ProjectRole = Field(default=ProjectRole.member)
     joined_at: datetime = Field(default_factory=get_utc_now)
+
+    user: "User" = Relationship(back_populates="project_memberships")
+    project: "Project" = Relationship(back_populates="project_members")
 
 
 # ===== Основные модели =====
@@ -76,19 +85,22 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
 
-    skills: List["Skill"] = Relationship(
-        back_populates="users",
-        link_model=UserSkill,
-    )
-    interests: List["Interest"] = Relationship(
-        back_populates="users",
-        link_model=UserInterest,
-    )
-    projects: List["Project"] = Relationship(
-        back_populates="members",
-        link_model=ProjectMember,
-    )
+    user_skills: List["UserSkill"] = Relationship(back_populates="user")
+    user_interests: List["UserInterest"] = Relationship(back_populates="user")
+    project_memberships: List["ProjectMember"] = Relationship(back_populates="user")
     tasks: List["Task"] = Relationship(back_populates="assignee")
+
+    @property
+    def skills(self) -> List["Skill"]:
+        return [us.skill for us in self.user_skills]
+    
+    @property
+    def interests(self) -> List["Interest"]:
+        return [ui.interest for ui in self.user_interests]
+    
+    @property
+    def projects(self) -> List["Project"]:
+        return [pm.project for pm in self.project_memberships]
 
 
 class Skill(SQLModel, table=True):
@@ -97,10 +109,11 @@ class Skill(SQLModel, table=True):
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
 
-    users: List[User] = Relationship(
-        back_populates="skills",
-        link_model=UserSkill,
-    )
+    user_skills: List["UserSkill"] = Relationship(back_populates="skill")
+
+    @property
+    def users(self) -> List["User"]:
+        return [us.user for us in self.user_skills]
 
 
 class Interest(SQLModel, table=True):
@@ -109,10 +122,11 @@ class Interest(SQLModel, table=True):
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
 
-    users: List[User] = Relationship(
-        back_populates="interests",
-        link_model=UserInterest,
-    )
+    user_interests: List["UserInterest"] = Relationship(back_populates="interest")
+    
+    @property
+    def users(self) -> List["User"]:
+        return [ui.user for ui in self.user_interests]
 
 
 class Project(SQLModel, table=True):
@@ -124,11 +138,12 @@ class Project(SQLModel, table=True):
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
 
-    members: List[User] = Relationship(
-        back_populates="projects",
-        link_model=ProjectMember,
-    )
+    project_members: List["ProjectMember"] = Relationship(back_populates="project")
     tasks: List["Task"] = Relationship(back_populates="project")
+
+    @property
+    def members(self) -> List["User"]:
+        return [pm.user for pm in self.project_members]
 
 
 class Task(SQLModel, table=True):

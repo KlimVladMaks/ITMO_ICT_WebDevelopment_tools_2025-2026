@@ -15,7 +15,7 @@ class UserCreate(BaseModel):
     about: Optional[str] = None
 
 
-class UserRead(BaseModel):
+class UserFullRead(BaseModel):
     id: int
     username: str
     email: str
@@ -23,9 +23,20 @@ class UserRead(BaseModel):
     about: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    skills: Optional[List["UserSkillRead"]] = None
-    interests: Optional[List["UserInterestRead"]] = None
-    projects: Optional[List["ProjectRead"]] = None
+    user_skills: Optional[List["UserSkillRead"]] = None
+    user_interests: Optional[List["UserInterestRead"]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserShortRead(BaseModel):
+    id: int
+    username: str
+    email: str
+    full_name: str
+    about: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -67,11 +78,9 @@ class UserSkillCreate(BaseModel):
 
 class UserSkillRead(BaseModel):
     id: int
-    user_id: int
-    skill_id: int
     level: Optional[models.SkillLevel] = None
     added_at: datetime
-    skill: Optional["SkillRead"] = None
+    skill: "SkillRead"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -109,10 +118,8 @@ class UserInterestCreate(BaseModel):
 
 class UserInterestRead(BaseModel):
     id: int
-    user_id: int
-    interest_id: int
     added_at: datetime
-    interest: Optional["InterestRead"] = None
+    interest: "InterestRead"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -127,7 +134,7 @@ class ProjectCreate(BaseModel):
     deadline: Optional[datetime] = None
 
 
-class ProjectRead(BaseModel):
+class ProjectFullRead(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
@@ -135,8 +142,19 @@ class ProjectRead(BaseModel):
     deadline: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    members: Optional[List["ProjectMemberRead"]] = None
-    tasks: Optional[List["TaskRead"]] = None
+    project_members: List["ProjectMemberRead"]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectShortRead(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    status: models.ProjectStatus
+    deadline: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -158,11 +176,9 @@ class ProjectMemberCreate(BaseModel):
 
 class ProjectMemberRead(BaseModel):
     id: int
-    user_id: int
-    project_id: int
     role: models.ProjectRole
     joined_at: datetime
-    user: Optional[UserRead] = None
+    user: UserShortRead
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -184,15 +200,14 @@ class TaskCreate(BaseModel):
 
 class TaskRead(BaseModel):
     id: int
-    project_id: int
-    assignee_id: int
     title: str
     description: Optional[str] = None
     status: models.TaskStatus
     deadline: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-    assignee: Optional[UserRead] = None
+    assignee: UserShortRead
+    project: ProjectShortRead
 
     model_config = ConfigDict(from_attributes=True)
 

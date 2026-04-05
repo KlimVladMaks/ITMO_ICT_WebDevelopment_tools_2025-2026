@@ -18,13 +18,13 @@ app = FastAPI(lifespan=lifespan)
 # ========== Users ==========
 
 
-@app.get("/users", response_model=List[schemas.UserRead], tags=["Users"])
+@app.get("/users", response_model=List[schemas.UserFullRead], tags=["Users"])
 def get_users(session: Session = Depends(get_session)):
     users = crud.get_users(session)
     return users
 
 
-@app.post("/users", response_model=schemas.UserRead, status_code=status.HTTP_201_CREATED, tags=["Users"])
+@app.post("/users", response_model=schemas.UserFullRead, status_code=status.HTTP_201_CREATED, tags=["Users"])
 def create_user(
     user_in: schemas.UserCreate,
     session: Session = Depends(get_session)
@@ -43,7 +43,7 @@ def create_user(
     return user
 
 
-@app.get("/users/{user_id}", response_model=schemas.UserRead, tags=["Users"])
+@app.get("/users/{user_id}", response_model=schemas.UserFullRead, tags=["Users"])
 def get_user(
     user_id: int,
     session: Session = Depends(get_session)
@@ -57,7 +57,7 @@ def get_user(
     return user
 
 
-@app.patch("/users/{user_id}", response_model=schemas.UserRead, tags=["Users"])
+@app.patch("/users/{user_id}", response_model=schemas.UserFullRead, tags=["Users"])
 def update_user(
     user_id: int,
     user_in: schemas.UserUpdate,
@@ -436,13 +436,13 @@ def delete_user_interest(
 # ========== Projects ==========
 
 
-@app.get("/projects", response_model=List[schemas.ProjectRead], tags=["Projects"])
+@app.get("/projects", response_model=List[schemas.ProjectFullRead], tags=["Projects"])
 def get_projects(session: Session = Depends(get_session)):
     projects = crud.get_projects(session)
     return projects
 
 
-@app.post("/projects", response_model=schemas.ProjectRead, status_code=status.HTTP_201_CREATED, tags=["Projects"])
+@app.post("/projects", response_model=schemas.ProjectFullRead, status_code=status.HTTP_201_CREATED, tags=["Projects"])
 def create_project(
     project_in: schemas.ProjectCreate,
     session: Session = Depends(get_session)
@@ -451,7 +451,7 @@ def create_project(
     return project
 
 
-@app.get("/projects/{project_id}", response_model=schemas.ProjectRead, tags=["Projects"])
+@app.get("/projects/{project_id}", response_model=schemas.ProjectFullRead, tags=["Projects"])
 def get_project(
     project_id: int,
     session: Session = Depends(get_session)
@@ -465,7 +465,7 @@ def get_project(
     return project
 
 
-@app.patch("/projects/{project_id}", response_model=schemas.ProjectRead, tags=["Projects"])
+@app.patch("/projects/{project_id}", response_model=schemas.ProjectFullRead, tags=["Projects"])
 def update_project(
     project_id: int,
     project_in: schemas.ProjectUpdate,
@@ -496,7 +496,7 @@ def delete_project(
     return None
 
 
-@app.get("/users/{user_id}/projects", response_model=List[schemas.ProjectRead], tags=["Projects"])
+@app.get("/users/{user_id}/projects", response_model=List[schemas.ProjectFullRead], tags=["Projects"])
 def get_user_projects(
     user_id: int,
     session: Session = Depends(get_session)

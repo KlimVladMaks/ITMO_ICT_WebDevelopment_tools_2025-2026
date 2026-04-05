@@ -1,4 +1,5 @@
 from sqlmodel import Session, select
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 
 from . import models
@@ -326,8 +327,11 @@ def delete_project_member(session: Session, member: models.ProjectMember) -> Non
 # ========== Tasks ==========
 
 
-def get_tasks_by_project(session: Session) -> List[models.Task]:
-    return session.exec(select(models.Task)).all()
+def get_tasks_by_project(session: Session, project_id: int) -> List[models.Task]:
+    return session.exec(
+        select(models.Task)
+        .where(models.Task.project_id == project_id)
+    ).all()
 
 
 def get_task_by_id(session: Session, task_id: int) -> Optional[models.Task]:
