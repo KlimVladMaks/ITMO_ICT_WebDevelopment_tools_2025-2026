@@ -3,6 +3,22 @@ from typing import List, Optional
 
 from . import models
 from . import schemas
+from . import auth
+
+
+# ========== Admin ==========
+
+
+def change_platform_admin_role(
+        session: Session, 
+        user: models.User,
+        user_role_in: schemas.ChangePlatformAdminRole
+):
+    user.is_platform_admin = user_role_in.is_platform_admin
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
 
 
 # ========== Users ==========
@@ -20,14 +36,12 @@ def get_user_by_username(session: Session, username: str) -> Optional[models.Use
     return session.exec(select(models.User).where(models.User.username == username)).first()
 
 
-def get_user_by_email(session: Session, email: str) -> Optional[models.User]:
-    return session.exec(select(models.User).where(models.User.email == email)).first()
-
-
 def create_user(session: Session, user_in: schemas.UserCreate) -> models.User:
+    password = user_in.password
+    password_hash = auth.hash_password(password)
     user = models.User(
         username=user_in.username,
-        email=user_in.email,
+        password_hash=password_hash,
         full_name=user_in.full_name,
         about=user_in.about
     )
@@ -300,18 +314,6 @@ def add_project_member(
         project_id=project_id,
         role=member_in.role
     )
-    session.add(member)
-    session.commit()
-    session.refresh(member)
-    return member
-
-
-def update_project_member(
-    session: Session, 
-    member: models.ProjectMember, 
-    role_in: schemas.ProjectMemberUpdateRole
-) -> models.ProjectMember:
-    member.role = role_in.role
     session.add(member)
     session.commit()
     session.refresh(member)

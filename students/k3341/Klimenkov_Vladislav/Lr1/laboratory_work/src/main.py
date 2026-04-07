@@ -5,6 +5,7 @@ from sqlmodel import Session
 from .database import init_db, get_session
 from . import schemas
 from . import crud
+from . import auth
 
 
 async def lifespan(app: FastAPI):
@@ -15,17 +16,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# ========== Users ==========
+# ========== Auth ==========
 
 
-@app.get("/users", response_model=List[schemas.UserFullRead], tags=["Users"])
-def get_users(session: Session = Depends(get_session)):
-    users = crud.get_users(session)
-    return users
-
-
-@app.post("/users", response_model=schemas.UserFullRead, status_code=status.HTTP_201_CREATED, tags=["Users"])
-def create_user(
+@app.post("/auth/register", 
+         response_model=schemas.UserFullRead, 
+         status_code=status.HTTP_201_CREATED, 
+         tags=["Auth"])
+def register(
     user_in: schemas.UserCreate,
     session: Session = Depends(get_session)
 ):
@@ -34,60 +32,35 @@ def create_user(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="Этот username уже занят"
         )
-    if crud.get_user_by_email(session, user_in.email):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Этот email уже занят"
-        )
     user = crud.create_user(session, user_in)
     return user
 
 
-@app.get("/users/{user_id}", response_model=schemas.UserFullRead, tags=["Users"])
-def get_user(
-    user_id: int,
+@app.post("/auth/login", response_model=schemas.LoginResponse, tags=["Auth"])
+def login(
+    login_in: schemas.LoginRequest,
     session: Session = Depends(get_session)
 ):
-    user = crud.get_user_by_id(session, user_id)
-    if not user:
+    user = crud.get_user_by_username(session, login_in.username)
+    if (user is None) or (not auth.verify_password(login_in.password, user.password_hash)):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Пользователь не найден"
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Неверное имя пользователя или пароль"
         )
-    return user
+    access_token = auth.encode_user_id(user.id)
+    return schemas.LoginResponse(
+        user=user,
+        access_token=access_token
+    )
 
 
-@app.patch("/users/{user_id}", response_model=schemas.UserFullRead, tags=["Users"])
-def update_user(
-    user_id: int,
-    user_in: schemas.UserUpdate,
-    session: Session = Depends(get_session)
-):
-    user = crud.get_user_by_id(session, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Пользователь не найден"
-        )
-    if user_in.username and user_in.username != user.username:
-        if crud.get_user_by_username(session, user_in.username):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="Этот username уже занят"
-            )
-    if user_in.email and user_in.email != user.email:
-        if crud.get_user_by_email(session, user_in.email):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="Этот email уже занят"
-            )
-    user = crud.update_user(session, user, user_in)
-    return user
+# ========== Admin ==========
 
 
-@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Users"])
+@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Admin"])
 def delete_user(
     user_id: int,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
     session: Session = Depends(get_session)
 ):
     user = crud.get_user_by_id(session, user_id)
@@ -100,11 +73,83 @@ def delete_user(
     return None
 
 
+@app.patch("/users/{user_id}/admin", response_model=schemas.UserShortRead, tags=["Admin"])
+def change_platform_admin_role(
+    user_id: int,
+    user_role_in: schemas.ChangePlatformAdminRole,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    user = crud.change_platform_admin_role(session, user, user_role_in)
+    return user
+
+
+# ========== Users ==========
+
+
+@app.get("/users/me", response_model=schemas.UserFullRead, tags=["Users"])
+def get_current_user(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, current_user_id)
+    return user
+
+
+@app.patch("/users/me", response_model=schemas.UserFullRead, tags=["Users"])
+def update_current_user(
+    user_in: schemas.UserUpdate,
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session),
+):
+    user = crud.get_user_by_id(session, current_user_id)
+    user = crud.update_user(session, user, user_in)
+    return user
+
+
+@app.delete("/users/me", status_code=status.HTTP_204_NO_CONTENT, tags=["Users"])
+def delete_current_user(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session),
+):
+    user = crud.get_user_by_id(session, current_user_id)
+    crud.delete_user(session, user)
+    return None
+
+
+@app.get("/users", response_model=List[schemas.UserFullRead], tags=["Users"])
+def get_users(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    users = crud.get_users(session)
+    return users
+
+
+@app.get("/users/{user_id}", response_model=schemas.UserFullRead, tags=["Users"])
+def get_user(
+    user_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    return user
+
+
 # ========== Skills ==========
 
 
 @app.get("/skills", response_model=List[schemas.SkillRead], tags=["Skills"])
-def get_skills(session: Session = Depends(get_session)):
+def get_skills(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
     skills = crud.get_skills(session)
     return skills
 
@@ -112,6 +157,7 @@ def get_skills(session: Session = Depends(get_session)):
 @app.post("/skills", response_model=schemas.SkillRead, status_code=status.HTTP_201_CREATED, tags=["Skills"])
 def create_skill(
     skill_in: schemas.SkillCreate,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
     session: Session = Depends(get_session)
 ):
     existing = crud.get_skill_by_name(session, skill_in.name)
@@ -127,6 +173,7 @@ def create_skill(
 @app.get("/skills/{skill_id}", response_model=schemas.SkillRead, tags=["Skills"])
 def get_skill(
     skill_id: int, 
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session),
 ):
     skill = crud.get_skill_by_id(session, skill_id)
@@ -142,6 +189,7 @@ def get_skill(
 def update_skill(
     skill_id: int,
     skill_in: schemas.SkillUpdate,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
     session: Session = Depends(get_session),
 ):
     skill = crud.get_skill_by_id(session, skill_id)
@@ -164,6 +212,7 @@ def update_skill(
 @app.delete("/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Skills"])
 def delete_skill(
     skill_id: int,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
     session: Session = Depends(get_session),
 ):
     skill = crud.get_skill_by_id(session, skill_id)
@@ -182,6 +231,7 @@ def delete_skill(
 @app.get("/users/{user_id}/skills", response_model=List[schemas.UserSkillRead], tags=["UserSkills"])
 def get_user_skills(
     user_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     user = crud.get_user_by_id(session, user_id)
@@ -194,34 +244,37 @@ def get_user_skills(
     return skills
 
 
-@app.post("/users/{user_id}/skills", 
+@app.get("/users/me/skills", response_model=List[schemas.UserSkillRead], tags=["UserSkills"])
+def get_current_user_skills(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    skills = crud.get_user_skills(session, current_user_id)
+    return skills
+
+
+@app.post("/users/me/skills", 
           response_model=schemas.UserSkillRead, 
           status_code=status.HTTP_201_CREATED, 
           tags=["UserSkills"])
 def add_user_skill(
-    user_id: int,
     skill_in: schemas.UserSkillCreate,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
-    user = crud.get_user_by_id(session, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Пользователь не найден",
-        )
     skill = crud.get_skill_by_id(session, skill_in.skill_id)
     if not skill:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Навык не найден",
         )
-    existing = crud.get_user_skill(session, user_id, skill_in.skill_id)
+    existing = crud.get_user_skill(session, current_user_id, skill_in.skill_id)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="Пользователь уже имеет этот навык"
         )
-    user_skill = crud.add_user_skill(session, user_id, skill_in)
+    user_skill = crud.add_user_skill(session, current_user_id, skill_in)
     return user_skill
 
 
@@ -595,25 +648,6 @@ def delete_project_member(
         )
     crud.delete_project_member(session, member)
     return None
-
-
-@app.patch("/projects/{project_id}/members/{user_id}/role", 
-           response_model=schemas.ProjectMemberRead, 
-           tags=["ProjectMembers"])
-def update_project_member_role(
-    project_id: int,
-    user_id: int,
-    role_in: schemas.ProjectMemberUpdateRole,
-    session: Session = Depends(get_session)
-):
-    member = crud.get_project_member(session, project_id, user_id)
-    if not member:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Участник проекта не найден"
-        )
-    member = crud.update_project_member(session, member, role_in)
-    return member
 
 
 # ========== Tasks ==========

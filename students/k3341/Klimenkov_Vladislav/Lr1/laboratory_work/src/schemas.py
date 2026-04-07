@@ -5,12 +5,34 @@ from datetime import datetime
 from . import models
 
 
+# ========== Auth ==========
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class LoginResponse(BaseModel):
+    user: "UserShortRead"
+    access_token: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ========== Admin ==========
+
+
+class ChangePlatformAdminRole(BaseModel):
+    is_platform_admin: bool = False
+
+
 # ========== Users ==========
 
 
 class UserCreate(BaseModel):
     username: str
-    email: str
+    password: str
     full_name: str
     about: Optional[str] = None
 
@@ -18,9 +40,9 @@ class UserCreate(BaseModel):
 class UserFullRead(BaseModel):
     id: int
     username: str
-    email: str
     full_name: str
     about: Optional[str] = None
+    is_platform_admin: bool
     created_at: datetime
     updated_at: datetime
     user_skills: List["UserSkillRead"]
@@ -33,9 +55,9 @@ class UserFullRead(BaseModel):
 class UserShortRead(BaseModel):
     id: int
     username: str
-    email: str
     full_name: str
     about: Optional[str] = None
+    is_platform_admin: bool
     created_at: datetime
     updated_at: datetime
 
@@ -44,7 +66,6 @@ class UserShortRead(BaseModel):
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
-    email: Optional[str] = None
     full_name: Optional[str] = None
     about: Optional[str] = None
 
@@ -172,20 +193,14 @@ class ProjectUpdate(BaseModel):
 
 class ProjectMemberCreate(BaseModel):
     user_id: int
-    role: models.ProjectRole = models.ProjectRole.member
 
 
 class ProjectMemberRead(BaseModel):
     id: int
-    role: models.ProjectRole
     joined_at: datetime
     user: UserShortRead
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class ProjectMemberUpdateRole(BaseModel):
-    role: models.ProjectRole
 
 
 # ========== Tasks ==========

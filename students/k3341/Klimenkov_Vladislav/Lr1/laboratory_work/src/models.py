@@ -27,11 +27,6 @@ class ProjectStatus(str, Enum):
     cancelled = "cancelled"
 
 
-class ProjectRole(str, Enum):
-    admin = "admin"
-    member = "member"
-
-
 class TaskStatus(str, Enum):
     todo = "todo"
     in_progress = "in_progress"
@@ -66,7 +61,7 @@ class ProjectMember(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id")
     project_id: int = Field(foreign_key="project.id")
-    role: ProjectRole = Field(default=ProjectRole.member)
+    is_project_admin: bool = Field(default=False)
     joined_at: datetime = Field(default_factory=get_utc_now)
 
     user: "User" = Relationship(back_populates="project_memberships")
@@ -79,17 +74,24 @@ class ProjectMember(SQLModel, table=True):
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True)
-    email: str = Field(unique=True)
     password_hash: str = Field()
     full_name: str = Field()
     about: Optional[str] = Field(default=None)
+    is_platform_admin: bool = Field(default=False)
     created_at: datetime = Field(default_factory=get_utc_now)
     updated_at: datetime = Field(default_factory=get_utc_now)
 
     user_skills: List["UserSkill"] = Relationship(back_populates="user")
     user_interests: List["UserInterest"] = Relationship(back_populates="user")
     project_memberships: List["ProjectMember"] = Relationship(back_populates="user")
-    tasks: List["Task"] = Relationship(back_populates="assignee")
+    assigned_tasks: List["Task"] = Relationship(
+        back_populates="assignee",
+        sa_relationship_kwargs={"foreign_keys": "[Task.assignee_id]"}
+    )
+    created_tasks: List["Task"] = Relationship(
+        back_populates="creator",
+        sa_relationship_kwargs={"foreign_keys": "[Task.creator_id]"}
+    )
 
     @property
     def skills(self) -> List["Skill"]:
@@ -150,6 +152,7 @@ class Project(SQLModel, table=True):
 class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="project.id")
+    creator_id: int = Field(foreign_key="user.id")
     assignee_id: int = Field(foreign_key="user.id")
     title: str = Field()
     description: Optional[str] = Field(default=None)
@@ -159,4 +162,11 @@ class Task(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=get_utc_now)
 
     project: Optional[Project] = Relationship(back_populates="tasks")
-    assignee: Optional[User] = Relationship(back_populates="tasks")
+    assignee: Optional[User] = Relationship(
+        back_populates="assigned_tasks",
+        sa_relationship_kwargs={"foreign_keys": "[Task.assignee_id]"}
+    )
+    creator: Optional[User] = Relationship(
+        back_populates="created_tasks",
+        sa_relationship_kwargs={"foreign_keys": "[Task.creator_id]"}
+    )
