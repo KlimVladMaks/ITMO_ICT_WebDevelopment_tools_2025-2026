@@ -24,8 +24,27 @@ def change_platform_admin_role(
 # ========== Users ==========
 
 
-def get_users(session: Session) -> List[models.User]:
-    return session.exec(select(models.User)).all()
+def get_users(
+        session: Session,
+        skill_ids: Optional[List[int]] = None,
+        interest_ids: Optional[List[int]] = None
+) -> List[models.User]:
+    query = select(models.User)
+    if skill_ids:
+        for skill_id in skill_ids:
+            subquery = (
+                select(models.UserSkill.user_id)
+                .where(models.UserSkill.skill_id == skill_id)
+            )
+            query = query.where(models.User.id.in_(subquery))
+    if interest_ids:
+        for interest_id in interest_ids:
+            subquery = (
+                select(models.UserInterest.user_id)
+                .where(models.UserInterest.interest_id == interest_id)
+            )
+            query = query.where(models.User.id.in_(subquery))
+    return session.exec(query).all()
 
 
 def get_user_by_id(session: Session, user_id: int) -> Optional[models.User]:
@@ -60,6 +79,13 @@ def update_user(session: Session, user: models.User, user_in: schemas.UserUpdate
     session.refresh(user)
     return user
 
+
+def update_user_password(session: Session, user: models.User, new_password: str) -> None:
+    password_hash = auth.hash_password(new_password)
+    user.password_hash = password_hash
+    session.add(user)
+    session.commit()
+    
 
 def delete_user(session: Session, user: models.User) -> None:
     session.delete(user)
@@ -247,7 +273,11 @@ def get_project_by_id(session: Session, project_id: int) -> Optional[models.Proj
     return session.get(models.Project, project_id)
 
 
-def create_project(session: Session, project_in: schemas.ProjectCreate,) -> models.Project:
+def create_project(
+        session: Session, 
+        project_in: schemas.ProjectCreate,
+        creator_id: int
+) -> models.Project:
     project = models.Project(
         title=project_in.title,
         description=project_in.description,
@@ -255,6 +285,13 @@ def create_project(session: Session, project_in: schemas.ProjectCreate,) -> mode
         deadline=project_in.deadline
     )
     session.add(project)
+    session.flush()
+    project_member = models.ProjectMember(
+        user_id=creator_id,
+        project_id=project.id,
+        is_project_admin=True
+    )
+    session.add(project_member)
     session.commit()
     session.refresh(project)
     return project
@@ -312,7 +349,6 @@ def add_project_member(
     member = models.ProjectMember(
         user_id=member_in.user_id,
         project_id=project_id,
-        role=member_in.role
     )
     session.add(member)
     session.commit()
@@ -323,6 +359,18 @@ def add_project_member(
 def delete_project_member(session: Session, member: models.ProjectMember) -> None:
     session.delete(member)
     session.commit()
+
+
+def update_project_member_role(
+        session: Session, 
+        member: models.ProjectMember,
+        role_in: schemas.ProjectMemberRoleUpdate
+):
+    member.is_project_admin = role_in.is_project_admin
+    session.add(member)
+    session.commit()
+    session.refresh(member)
+    return member
 
 
 # ========== Tasks ==========
@@ -341,11 +389,13 @@ def get_task_by_id(session: Session, task_id: int) -> Optional[models.Task]:
 
 def create_task(
     session: Session, 
-    project_id: int, 
+    project_id: int,
+    creator_id: int,
     task_in: schemas.TaskCreate
 ) -> models.Task:
     task = models.Task(
         project_id=project_id,
+        creator_id=creator_id,
         assignee_id=task_in.assignee_id,
         title=task_in.title,
         description=task_in.description,

@@ -70,6 +70,11 @@ class UserUpdate(BaseModel):
     about: Optional[str] = None
 
 
+class UserPasswordUpdate(BaseModel):
+    old_password: str
+    new_password: str
+
+
 # ========== Skills ==========
 
 
@@ -99,7 +104,6 @@ class UserSkillCreate(BaseModel):
 
 
 class UserSkillRead(BaseModel):
-    id: int
     level: Optional[models.SkillLevel] = None
     added_at: datetime
     skill: "SkillRead"
@@ -139,7 +143,6 @@ class UserInterestCreate(BaseModel):
 
 
 class UserInterestRead(BaseModel):
-    id: int
     added_at: datetime
     interest: "InterestRead"
 
@@ -196,11 +199,15 @@ class ProjectMemberCreate(BaseModel):
 
 
 class ProjectMemberRead(BaseModel):
-    id: int
     joined_at: datetime
+    is_project_admin: bool
     user: UserShortRead
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProjectMemberRoleUpdate(BaseModel):
+    is_project_admin: bool = False
 
 
 # ========== Tasks ==========

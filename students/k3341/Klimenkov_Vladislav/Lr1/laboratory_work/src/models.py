@@ -152,8 +152,8 @@ class Project(SQLModel, table=True):
 class Task(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     project_id: int = Field(foreign_key="project.id")
-    creator_id: int = Field(foreign_key="user.id")
-    assignee_id: int = Field(foreign_key="user.id")
+    creator_id: Optional[int] = Field(foreign_key="user.id", default=None)
+    assignee_id: Optional[int] = Field(foreign_key="user.id", default=None)
     title: str = Field()
     description: Optional[str] = Field(default=None)
     status: TaskStatus = Field(default=TaskStatus.todo)

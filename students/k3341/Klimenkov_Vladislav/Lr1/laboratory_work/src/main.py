@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from typing import List
+from fastapi import FastAPI, Depends, HTTPException, Query, status
+from typing import List, Optional
 from sqlmodel import Session
 
 from .database import init_db, get_session
@@ -54,38 +54,22 @@ def login(
     )
 
 
-# ========== Admin ==========
-
-
-@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Admin"])
-def delete_user(
-    user_id: int,
-    current_admin_id: int = Depends(auth.get_current_admin_id),
-    session: Session = Depends(get_session)
-):
-    user = crud.get_user_by_id(session, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Пользователь не найден"
-        )
-    crud.delete_user(session, user)
-    return None
-
-
-@app.patch("/users/{user_id}/admin", response_model=schemas.UserShortRead, tags=["Admin"])
-def change_platform_admin_role(
-    user_id: int,
-    user_role_in: schemas.ChangePlatformAdminRole,
-    current_admin_id: int = Depends(auth.get_current_admin_id),
-    session: Session = Depends(get_session)
-):
-    user = crud.get_user_by_id(session, user_id)
-    user = crud.change_platform_admin_role(session, user, user_role_in)
-    return user
-
-
 # ========== Users ==========
+
+
+@app.get("/users", response_model=List[schemas.UserFullRead], tags=["Users"])
+def get_users(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session),
+    skill_ids: Optional[List[int]] = Query(None),
+    interest_ids: Optional[List[int]] = Query(None)
+):
+    users = crud.get_users(
+        session=session,
+        skill_ids=skill_ids,
+        interest_ids=interest_ids
+    )
+    return users
 
 
 @app.get("/users/me", response_model=schemas.UserFullRead, tags=["Users"])
@@ -94,6 +78,11 @@ def get_current_user(
     session: Session = Depends(get_session)
 ):
     user = crud.get_user_by_id(session, current_user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
     return user
 
 
@@ -118,13 +107,25 @@ def delete_current_user(
     return None
 
 
-@app.get("/users", response_model=List[schemas.UserFullRead], tags=["Users"])
-def get_users(
+@app.patch("/users/me/password", status_code=status.HTTP_200_OK, tags=["Users"])
+def update_current_user_password(
+    password_in: schemas.UserPasswordUpdate,
     current_user_id: int = Depends(auth.get_current_user_id),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
-    users = crud.get_users(session)
-    return users
+    user = crud.get_user_by_id(session, current_user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    if not auth.verify_password(password_in.old_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Неверный старый пароль"
+        )
+    crud.update_user_password(session, user, password_in.new_password)
+    return None
 
 
 @app.get("/users/{user_id}", response_model=schemas.UserFullRead, tags=["Users"])
@@ -139,6 +140,34 @@ def get_user(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Пользователь не найден"
         )
+    return user
+
+
+@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Users"])
+def delete_user(
+    user_id: int,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Пользователь не найден"
+        )
+    crud.delete_user(session, user)
+    return None
+
+
+@app.patch("/users/{user_id}/admin", response_model=schemas.UserShortRead, tags=["Users"])
+def change_platform_admin_role(
+    user_id: int,
+    user_role_in: schemas.ChangePlatformAdminRole,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    user = crud.change_platform_admin_role(session, user, user_role_in)
     return user
 
 
@@ -228,22 +257,6 @@ def delete_skill(
 # ========== UserSkills ==========
 
 
-@app.get("/users/{user_id}/skills", response_model=List[schemas.UserSkillRead], tags=["UserSkills"])
-def get_user_skills(
-    user_id: int,
-    current_user_id: int = Depends(auth.get_current_user_id),
-    session: Session = Depends(get_session)
-):
-    user = crud.get_user_by_id(session, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Пользователь не найден",
-        )
-    skills = crud.get_user_skills(session, user_id)
-    return skills
-
-
 @app.get("/users/me/skills", response_model=List[schemas.UserSkillRead], tags=["UserSkills"])
 def get_current_user_skills(
     current_user_id: int = Depends(auth.get_current_user_id),
@@ -278,28 +291,15 @@ def add_user_skill(
     return user_skill
 
 
-@app.get("/users/{user_id}/skills/{skill_id}", response_model=schemas.UserSkillRead, tags=["UserSkills"])
-def get_user_skill(
-    user_id: int,
+@app.delete("/users/me/skills/{skill_id}",
+            status_code=status.HTTP_204_NO_CONTENT,
+            tags=["UserSkills"])
+def delete_current_user_skill(
     skill_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
-    user_skill = crud.get_user_skill(session, user_id, skill_id)
-    if not user_skill:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Навык пользователя не найден",
-        )
-    return user_skill
-
-
-@app.delete("/users/{user_id}/skills/{skill_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["UserSkills"])
-def delete_user_skill(
-    user_id: int,
-    skill_id: int,
-    session: Session = Depends(get_session)
-):
-    user_skill = crud.get_user_skill(session, user_id, skill_id)
+    user_skill = crud.get_user_skill(session, current_user_id, skill_id)
     if not user_skill:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -309,14 +309,14 @@ def delete_user_skill(
     return None
 
 
-@app.patch("/users/{user_id}/skills/{skill_id}/level", response_model=schemas.UserSkillRead, tags=["UserSkills"])
+@app.patch("/users/me/skills/{skill_id}/level", response_model=schemas.UserSkillRead, tags=["UserSkills"])
 def update_user_skill_level(
-    user_id: int,
     skill_id: int,
     level_in: schemas.UserSkillUpdateLevel,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
-    user_skill = crud.get_user_skill(session, user_id, skill_id)
+    user_skill = crud.get_user_skill(session, current_user_id, skill_id)
     if not user_skill:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -326,11 +326,46 @@ def update_user_skill_level(
     return user_skill
 
 
+@app.get("/users/{user_id}/skills", response_model=List[schemas.UserSkillRead], tags=["UserSkills"])
+def get_user_skills(
+    user_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    user = crud.get_user_by_id(session, user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Пользователь не найден",
+        )
+    skills = crud.get_user_skills(session, user_id)
+    return skills
+
+
+@app.get("/users/{user_id}/skills/{skill_id}", response_model=schemas.UserSkillRead, tags=["UserSkills"])
+def get_user_skill(
+    user_id: int,
+    skill_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    user_skill = crud.get_user_skill(session, user_id, skill_id)
+    if not user_skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Навык пользователя не найден",
+        )
+    return user_skill
+
+
 # ========== Interests ==========
 
 
 @app.get("/interests", response_model=List[schemas.InterestRead], tags=["Interests"])
-def get_interests(session: Session = Depends(get_session)):
+def get_interests(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
     interests = crud.get_interests(session)
     return interests
 
@@ -338,6 +373,7 @@ def get_interests(session: Session = Depends(get_session)):
 @app.post("/interests", response_model=schemas.InterestRead, status_code=status.HTTP_201_CREATED, tags=["Interests"])
 def create_interest(
     interest_in: schemas.InterestCreate,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
     session: Session = Depends(get_session)
 ):
     existing = crud.get_interest_by_name(session, interest_in.name)
@@ -352,7 +388,8 @@ def create_interest(
 
 @app.get("/interests/{interest_id}", response_model=schemas.InterestRead, tags=["Interests"])
 def get_interest(
-    interest_id: int, 
+    interest_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session),
 ):
     interest = crud.get_interest_by_id(session, interest_id)
@@ -368,6 +405,7 @@ def get_interest(
 def update_interest(
     interest_id: int,
     interest_in: schemas.InterestUpdate,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
     session: Session = Depends(get_session),
 ):
     interest = crud.get_interest_by_id(session, interest_id)
@@ -390,6 +428,7 @@ def update_interest(
 @app.delete("/interests/{interest_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Interests"])
 def delete_interest(
     interest_id: int,
+    current_admin_id: int = Depends(auth.get_current_admin_id),
     session: Session = Depends(get_session),
 ):
     interest = crud.get_interest_by_id(session, interest_id)
@@ -405,9 +444,51 @@ def delete_interest(
 # ========== UserInterests ==========
 
 
+@app.get("/users/me/interests", response_model=List[schemas.UserInterestRead], tags=["UserInterests"])
+def get_current_user_interests(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    interests = crud.get_user_interests(session, current_user_id)
+    return interests
+
+
+@app.post("/users/me/interests", response_model=schemas.UserInterestRead, tags=["UserInterests"])
+def add_current_user_interest(
+    interest_in: schemas.UserInterestCreate,
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    interest = crud.get_interest_by_id(session, interest_in.interest_id)
+    if not interest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Интерес не найден"
+        )
+    user_interest = crud.add_user_interest(session, current_user_id, interest_in)
+    return user_interest
+
+
+@app.delete("/users/me/interests/{interest_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["UserInterests"])
+def delete_current_user_interest(
+    interest_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    user_interest = crud.get_user_interest(session, current_user_id, interest_id)
+    if not user_interest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Интерес пользователя не найден"
+        )
+    crud.delete_user_interest(session, user_interest)
+    return None
+
+
 @app.get("/users/{user_id}/interests", response_model=List[schemas.UserInterestRead], tags=["UserInterests"])
 def get_user_interests(
     user_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     user = crud.get_user_by_id(session, user_id)
@@ -418,37 +499,6 @@ def get_user_interests(
         )
     interests = crud.get_user_interests(session, user_id)
     return interests
-
-
-@app.post("/users/{user_id}/interests", 
-          response_model=schemas.UserInterestRead, 
-          status_code=status.HTTP_201_CREATED, 
-          tags=["UserInterests"])
-def add_user_interest(
-    user_id: int,
-    interest_in: schemas.UserInterestCreate,
-    session: Session = Depends(get_session)
-):
-    user = crud.get_user_by_id(session, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Пользователь не найден"
-        )
-    interest = crud.get_interest_by_id(session, interest_in.interest_id)
-    if not interest:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Интерес не найден"
-        )
-    existing = crud.get_user_interest(session, user_id, interest_in.interest_id)
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Пользователь уже имеет этот интерес"
-        )
-    user_interest = crud.add_user_interest(session, user_id, interest_in)
-    return user_interest
 
 
 @app.get("/users/{user_id}/interests/{interest_id}", 
@@ -468,29 +518,14 @@ def get_user_interest(
     return user_interest
 
 
-@app.delete("/users/{user_id}/interests/{interest_id}", 
-            status_code=status.HTTP_204_NO_CONTENT, 
-            tags=["UserInterests"])
-def delete_user_interest(
-    user_id: int,
-    interest_id: int,
-    session: Session = Depends(get_session)
-):
-    user_interest = crud.get_user_interest(session, user_id, interest_id)
-    if not user_interest:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Интерес пользователя не найден"
-        )
-    crud.delete_user_interest(session, user_interest)
-    return None
-
-
 # ========== Projects ==========
 
 
 @app.get("/projects", response_model=List[schemas.ProjectFullRead], tags=["Projects"])
-def get_projects(session: Session = Depends(get_session)):
+def get_projects(
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
     projects = crud.get_projects(session)
     return projects
 
@@ -498,15 +533,17 @@ def get_projects(session: Session = Depends(get_session)):
 @app.post("/projects", response_model=schemas.ProjectFullRead, status_code=status.HTTP_201_CREATED, tags=["Projects"])
 def create_project(
     project_in: schemas.ProjectCreate,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
-    project = crud.create_project(session, project_in)
+    project = crud.create_project(session, project_in, current_user_id)
     return project
 
 
 @app.get("/projects/{project_id}", response_model=schemas.ProjectFullRead, tags=["Projects"])
 def get_project(
     project_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     project = crud.get_project_by_id(session, project_id)
@@ -522,6 +559,7 @@ def get_project(
 def update_project(
     project_id: int,
     project_in: schemas.ProjectUpdate,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     project = crud.get_project_by_id(session, project_id)
@@ -529,6 +567,12 @@ def update_project(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Проект не найден"
+        )
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if (project_member is None) or (not project_member.is_project_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Изменять проект могут только админы проекта"
         )
     project = crud.update_project(session, project, project_in)
     return project
@@ -537,6 +581,7 @@ def update_project(
 @app.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["Projects"])
 def delete_project(
     project_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     project = crud.get_project_by_id(session, project_id)
@@ -545,6 +590,12 @@ def delete_project(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Проект не найден"
         )
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if (project_member is None) or (not project_member.is_project_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Удалить проект могут только админы проекта"
+        )
     crud.delete_project(session, project)
     return None
 
@@ -552,6 +603,7 @@ def delete_project(
 @app.get("/users/{user_id}/projects", response_model=List[schemas.ProjectShortRead], tags=["Projects"])
 def get_user_projects(
     user_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     user = crud.get_user_by_id(session, user_id)
@@ -572,6 +624,7 @@ def get_user_projects(
          tags=["ProjectMembers"])
 def get_project_members(
     project_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     project = crud.get_project_by_id(session, project_id)
@@ -591,8 +644,15 @@ def get_project_members(
 def add_project_member(
     project_id: int,
     member_in: schemas.ProjectMemberCreate,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if (project_member is None) or (not project_member.is_project_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Добавлять новых участников могут только админы проекта"
+        )
     project = crud.get_project_by_id(session, project_id)
     if not project:
         raise HTTPException(
@@ -621,6 +681,7 @@ def add_project_member(
 def get_project_member(
     project_id: int,
     user_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     member = crud.get_project_member(session, project_id, user_id)
@@ -638,8 +699,15 @@ def get_project_member(
 def delete_project_member(
     project_id: int,
     user_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if (project_member is None) or (not project_member.is_project_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Удалять участников могут только админы проекта"
+        )
     member = crud.get_project_member(session, project_id, user_id)
     if not member:
         raise HTTPException(
@@ -650,12 +718,39 @@ def delete_project_member(
     return None
 
 
+@app.patch("/projects/{project_id}/members/{user_id}/admin",
+            response_model=schemas.ProjectMemberRead,
+            tags=["ProjectMembers"])
+def update_project_member_role(
+    project_id: int,
+    user_id: int,
+    role_in: schemas.ProjectMemberRoleUpdate,
+    current_user_id: int = Depends(auth.get_current_user_id),
+    session: Session = Depends(get_session)
+):
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if (project_member is None) or (not project_member.is_project_admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Изменять роли участников могут только админы проекта"
+        )
+    member = crud.get_project_member(session, project_id, user_id)
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Участник проекта не найден"
+        )
+    member = crud.update_project_member_role(session, member, role_in)
+    return member
+
+
 # ========== Tasks ==========
 
 
 @app.get("/projects/{project_id}/tasks", response_model=List[schemas.TaskRead], tags=["Tasks"])
 def get_tasks(
     project_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session),
 ):
     project = crud.get_project_by_id(session, project_id)
@@ -663,6 +758,12 @@ def get_tasks(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Проект не найден"
+        )
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if project_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Смотреть задачи могут только участники проекта"
         )
     tasks = crud.get_tasks_by_project(session, project_id)
     return tasks
@@ -675,6 +776,7 @@ def get_tasks(
 def create_task(
     project_id: int,
     task_in: schemas.TaskCreate,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     project = crud.get_project_by_id(session, project_id)
@@ -682,6 +784,12 @@ def create_task(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail="Проект не найден"
+        )
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if project_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Создавать задачи могут только участники проекта"
         )
     assignee = crud.get_user_by_id(session, task_in.assignee_id)
     if not assignee:
@@ -695,7 +803,7 @@ def create_task(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail="Получатель задачи не является участником проекта"
         )
-    task = crud.create_task(session, project_id, task_in)
+    task = crud.create_task(session, project_id, current_user_id, task_in)
     return task
 
 
@@ -703,8 +811,15 @@ def create_task(
 def get_task(
     project_id: int,
     task_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if project_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Смотреть задачи могут только участники проекта"
+        )
     task = crud.get_task_by_id(session, task_id)
     if not task or task.project_id != project_id:
         raise HTTPException(
@@ -719,8 +834,15 @@ def update_task(
     project_id: int,
     task_id: int,
     task_in: schemas.TaskUpdate,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if project_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Изменять задачи могут только участники проекта"
+        )
     task = crud.get_task_by_id(session, task_id)
     if not task or task.project_id != project_id:
         raise HTTPException(
@@ -748,8 +870,15 @@ def update_task(
 def delete_task(
     project_id: int,
     task_id: int,
+    current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
+    project_member = crud.get_project_member(session, project_id, current_user_id)
+    if project_member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Удалять задачи могут только участники проекта"
+        )
     task = crud.get_task_by_id(session, task_id)
     if not task or task.project_id != project_id:
         raise HTTPException(
