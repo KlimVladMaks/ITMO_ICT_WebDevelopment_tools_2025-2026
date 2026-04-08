@@ -1,0 +1,23 @@
+site_name: Web-программирование
+site_url: https://KlimVladMaks.github.io/ITMO_ICT_WebDevelopment_tools_2025-2026/
+site_author: Владислав Клименков
+
+theme:
+  name: material
+  language: ru
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - attr_list
+  - md_in_html
+  - pymdownx.blocks.caption
+
+nav:
+  - Главная: index.md
+  - ЛР №1: lab_1/report.md
