@@ -21,3 +21,6 @@ markdown_extensions:
 nav:
   - Главная: index.md
   - ЛР №1: lab_1/report.md
+  - ЛР №2:
+    - lab_2/task_1.md
+    - lab_2/task_2.md
