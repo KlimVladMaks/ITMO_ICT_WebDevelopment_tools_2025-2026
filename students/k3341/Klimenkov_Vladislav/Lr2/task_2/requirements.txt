@@ -1,9 +1,16 @@
+aiohappyeyeballs==2.6.1
+aiohttp==3.13.5
+aiosignal==1.4.0
 annotated-types==0.7.0
+attrs==26.1.0
 beautifulsoup4==4.14.3
 certifi==2026.4.22
 charset-normalizer==3.4.7
+frozenlist==1.8.0
 greenlet==3.5.0
 idna==3.13
+multidict==6.7.1
+propcache==0.4.1
 psycopg2-binary==2.9.12
 pydantic==2.13.3
 pydantic_core==2.46.3
@@ -14,3 +21,4 @@ sqlmodel==0.0.38
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.6.3
+yarl==1.23.0

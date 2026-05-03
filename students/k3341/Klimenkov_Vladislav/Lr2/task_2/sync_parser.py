@@ -1,7 +1,3 @@
-"""
-python3 sync_parser.py
-"""
-
 import time
 import requests
 from sqlmodel import Session, delete
@@ -52,6 +48,6 @@ if __name__ == "__main__":
         session.exec(delete(Skill))
         session.commit()
 
-    urls = get_language_urls(limit=10)
+    urls = get_language_urls(limit=100)
     print(f"Получено {len(urls)} ссылок")
     run_sync(urls)
