@@ -85,6 +85,7 @@ class SkillCreate(BaseModel):
 class SkillRead(BaseModel):
     id: int
     name: str
+    description: Optional[str]
     created_at: datetime
     updated_at: datetime
 
