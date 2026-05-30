@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from typing import List, Optional
 from sqlmodel import Session
+import httpx
 
 from .database import init_db, get_session
 from . import schemas
@@ -14,6 +15,30 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+# ========== Parser ==========
+
+
+@app.post("/parse-skills", tags=["Parser"])
+async def call_parser(limit: int = Query(10, ge=1, le=200, description="Количество языков для парсинга")):
+    """
+    Вызывает парсер (сервис parser) для извлечения языков программирования из Wikipedia как skills.
+    Возвращает результат парсинга клиенту.
+    """
+    parser_url = "http://parser:8001/parse"
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(parser_url, params={"limit": limit})
+            response.raise_for_status()
+            return response.json()
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Parser service timeout")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=e.response.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
 
 # ========== Auth ==========
@@ -174,9 +199,9 @@ def change_platform_admin_role(
 # ========== Skills ==========
 
 
-@app.get("/skills", response_model=List[schemas.SkillRead], tags=["Skills"])
+@app.get("/skills", response_model=List[schemas.SkillRead], tags=["Parser", "Skills"])
 def get_skills(
-    current_user_id: int = Depends(auth.get_current_user_id),
+    # current_user_id: int = Depends(auth.get_current_user_id),
     session: Session = Depends(get_session)
 ):
     skills = crud.get_skills(session)
