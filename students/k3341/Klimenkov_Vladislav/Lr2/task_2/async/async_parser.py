@@ -62,7 +62,7 @@ async def clear_db():
 async def main():
     await init_db()
     await clear_db()
-    urls = get_language_urls(limit=10)
+    urls = get_language_urls(limit=100)
     print(f"🔗 Получено {len(urls)} ссылок")
     await run_async(urls)
 
